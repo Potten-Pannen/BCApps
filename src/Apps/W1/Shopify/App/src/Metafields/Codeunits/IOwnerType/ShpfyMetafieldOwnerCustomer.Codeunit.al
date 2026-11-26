@@ -14,8 +14,10 @@ codeunit 30333 "Shpfy Metafield Owner Customer" implements "Shpfy IMetafield Own
 
     procedure RetrieveMetafieldIdsFromShopify(OwnerId: BigInteger) MetafieldIds: Dictionary of [BigInteger, DateTime]
     var
+        ShopifyShop: Record "Shpfy Shop";
         CommunicationMgt: Codeunit "Shpfy Communication Mgt.";
         JsonHelper: Codeunit "Shpfy Json Helper";
+        MetafieldAPI: Codeunit "Shpfy Metafield API";
         Parameters: Dictionary of [Text, Text];
         GraphQLType: Enum "Shpfy GraphQL Type";
         JResponse: JsonToken;
@@ -27,6 +29,8 @@ codeunit 30333 "Shpfy Metafield Owner Customer" implements "Shpfy IMetafield Own
         UpdatedAt: DateTime;
     begin
         Parameters.Add('CustomerId', Format(OwnerId));
+        ShopifyShop.Get(GetShopCode(OwnerId));
+        Parameters.Add('NamespaceFilter', MetafieldAPI.GetNamespaceFilterParameter(ShopifyShop));
         GraphQLType := GraphQLType::Metafields_CustomerMetafieldIds;
         JResponse := CommunicationMgt.ExecuteGraphQL(GraphQLType, Parameters);
         if JsonHelper.GetJsonObject(JResponse, JCustomer, 'data.customer') then

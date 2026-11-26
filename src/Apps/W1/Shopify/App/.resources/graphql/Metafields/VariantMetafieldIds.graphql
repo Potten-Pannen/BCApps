@@ -1,2 +1,2 @@
 # cost: 10
-{"query":"{productVariant(id: \"gid://shopify/ProductVariant/{{VariantId}}\") { metafields(first: 50) {edges{ node{legacyResourceId updatedAt}}}}}"}
+{"query":"{productVariant(id: \"gid://shopify/ProductVariant/{{VariantId}}\") { metafields(first: 50{{NamespaceFilter}}) {edges{ node{legacyResourceId updatedAt}}}}}"}

@@ -239,6 +239,10 @@ page 30101 "Shpfy Shop Card"
                 {
                     ApplicationArea = All;
                 }
+                field("Metafield Namespace Filter"; Rec."Metafield Namespace Filter")
+                {
+                    ApplicationArea = All;
+                }
             }
             group(PriceSynchronization)
             {

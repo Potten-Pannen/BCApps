@@ -352,6 +352,7 @@ codeunit 30176 "Shpfy Product API"
     begin
         Parameters.Add('ProductId', Format(ShopifyProduct.Id));
         Parameters.add('MaxLengthDescription', Format(MaxStrLen(ShopifyProduct.Description)));
+        Parameters.Add('NamespaceFilter', MetafieldAPI.GetNamespaceFilterParameter(Shop));
         JResponse := CommunicationMgt.ExecuteGraphQL(GraphQLType::Products_GetProductById, Parameters);
         if JsonHelper.GetJsonObject(JResponse, JProduct, 'data.product') then
             exit(UpdateShopifyProductFields(ShopifyProduct, JProduct));

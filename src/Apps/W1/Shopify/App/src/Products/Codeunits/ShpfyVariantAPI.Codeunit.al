@@ -564,6 +564,7 @@ codeunit 30189 "Shpfy Variant API"
         JResponse: JsonToken;
     begin
         Parameters.Add('VariantId', Format(ShopifyVariant.Id));
+        Parameters.Add('NamespaceFilter', MetafieldAPI.GetNamespaceFilterParameter(Shop));
         JResponse := CommunicationMgt.ExecuteGraphQL(GraphQLType::Products_GetVariantById, Parameters);
         // When the productVariant node is present, the variant still exists on Shopify, so report it as existing.
         // UpdateShopifyVariantFields internally skips the field update when the local record is already up to date.
