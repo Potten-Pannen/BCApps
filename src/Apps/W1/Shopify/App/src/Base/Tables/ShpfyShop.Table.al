@@ -971,6 +971,17 @@ table 30102 "Shpfy Shop"
             DataClassification = SystemMetadata;
             InitValue = true;
         }
+        field(210; "Metafield Namespace Filter"; Text[255])
+        {
+            Caption = 'Metafield Namespace Filter';
+            ToolTip = 'Specifies the Shopify metafield namespace that the connector retrieves and synchronizes. Leave empty to include all namespaces.';
+            DataClassification = SystemMetadata;
+
+            trigger OnValidate()
+            begin
+                "Metafield Namespace Filter" := CopyStr("Metafield Namespace Filter".Trim(), 1, MaxStrLen("Metafield Namespace Filter"));
+            end;
+        }
     }
 
     keys

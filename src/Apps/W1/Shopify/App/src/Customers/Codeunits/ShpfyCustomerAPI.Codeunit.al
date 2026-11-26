@@ -207,6 +207,7 @@ codeunit 30114 "Shpfy Customer API"
             exit(false);
 
         Parameters.Add('CustomerId', Format(ShopifyCustomer.Id));
+        Parameters.Add('NamespaceFilter', MetafieldAPI.GetNamespaceFilterParameter(Shop));
         JResponse := CommunicationMgt.ExecuteGraphQL(GraphQLType::Customers_GetCustomer, Parameters);
         if JsonHelper.GetJsonObject(JResponse, JCustomer, 'data.customer') then
             exit(UpdateShopifyCustomerFields(ShopifyCustomer, JCustomer));

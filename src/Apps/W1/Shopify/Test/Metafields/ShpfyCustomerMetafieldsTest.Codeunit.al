@@ -213,6 +213,122 @@ codeunit 139548 "Shpfy Customer Metafields Test"
         // [THEN] Export completes without error (metafield data was sent to Shopify).
     end;
 
+    [Test]
+    procedure UnitTestNamespaceFilterParameterIsEmptyWithoutFilter()
+    var
+        MetafieldAPI: Codeunit "Shpfy Metafield API";
+    begin
+        // [SCENARIO] No namespace argument is added to metafield queries when the shop has no namespace filter.
+        Initialize();
+
+        // [GIVEN] Shop without a metafield namespace filter
+        Shop."Metafield Namespace Filter" := '';
+
+        // [WHEN] Invoke MetafieldAPI.GetNamespaceFilterParameter
+        // [THEN] The parameter is empty
+        LibraryAssert.AreEqual('', MetafieldAPI.GetNamespaceFilterParameter(Shop), 'Namespace filter parameter must be empty when no filter is set');
+    end;
+
+    [Test]
+    procedure UnitTestNamespaceFilterParameterContainsEscapedNamespace()
+    var
+        MetafieldAPI: Codeunit "Shpfy Metafield API";
+    begin
+        // [SCENARIO] The namespace argument contains the namespace from the shop, escaped for GraphQL.
+        Initialize();
+
+        // [GIVEN] Shop with a metafield namespace filter
+        Shop."Metafield Namespace Filter" := 'Microsoft.Dynamics365.BusinessCentral';
+        // [THEN] The parameter is the namespace argument
+        LibraryAssert.AreEqual(', namespace: \"Microsoft.Dynamics365.BusinessCentral\"', MetafieldAPI.GetNamespaceFilterParameter(Shop), 'Namespace filter parameter is different than expected');
+
+        // [GIVEN] Shop with a metafield namespace filter that contains a quote and a backslash
+        Shop."Metafield Namespace Filter" := 'a"b\c';
+        // [THEN] The quote and the backslash are escaped
+        LibraryAssert.AreEqual(', namespace: \"a\\\"b\\\\c\"', MetafieldAPI.GetNamespaceFilterParameter(Shop), 'Namespace filter parameter is not escaped');
+
+        Shop."Metafield Namespace Filter" := '';
+    end;
+
+    [Test]
+    procedure UnitTestNamespaceFilterIsTrimmedOnValidate()
+    begin
+        // [SCENARIO] Leading and trailing spaces are removed from the metafield namespace filter.
+        Initialize();
+
+        // [WHEN] Validate the metafield namespace filter with surrounding spaces
+        Shop.Validate("Metafield Namespace Filter", '  bcentral ');
+
+        // [THEN] The spaces are removed
+        LibraryAssert.AreEqual('bcentral', Shop."Metafield Namespace Filter", 'Metafield namespace filter is not trimmed');
+
+        Shop."Metafield Namespace Filter" := '';
+    end;
+
+    [Test]
+    procedure UnitTestMetafieldQueriesApplyNamespaceFilter()
+    begin
+        // [SCENARIO] Every query that retrieves metafields or metafield definitions accepts the namespace filter parameter.
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Products_GetProductById);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Products_GetVariantById);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Customers_GetCustomer);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Companies_GetCompany);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Metafields_ProductMetafieldIds);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Metafields_VariantMetafieldIds);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Metafields_CustomerMetafieldIds);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Metafields_CompanyMetafieldIds);
+        VerifyNamespaceFilterInQuery(Enum::"Shpfy GraphQL Type"::Metafields_GetMetafieldDefinitions);
+    end;
+
+    [Test]
+    procedure UnitTestImportWithNamespaceFilterKeepsOtherNamespaces()
+    var
+        ShpfyMetafield: Record "Shpfy Metafield";
+        MetafieldAPI: Codeunit "Shpfy Metafield API";
+        ShpfyMetafieldsHelper: Codeunit "Shpfy Metafields Helper";
+        FilteredMetafieldId: BigInteger;
+        OtherMetafieldId: BigInteger;
+        JMetafields: JsonArray;
+    begin
+        // [SCENARIO] With a namespace filter, import only removes metafields in the filtered namespace.
+        Initialize();
+
+        // [GIVEN] Shop with a metafield namespace filter
+        Shop."Metafield Namespace Filter" := 'bcentral';
+        MetafieldAPI.SetShop(Shop);
+        // [GIVEN] A metafield in the filtered namespace and a metafield in another namespace
+        FilteredMetafieldId := ShpfyMetafieldsHelper.CreateMetafield(ShpfyMetafield, ShpfyCustomer.Id, Database::"Shpfy Customer", 'bcentral', 'filtered', 'value');
+        OtherMetafieldId := ShpfyMetafieldsHelper.CreateMetafield(ShpfyMetafield, ShpfyCustomer.Id, Database::"Shpfy Customer", 'other', 'kept', 'value');
+
+        // [WHEN] Invoke MetafieldAPI.UpdateMetafieldsFromShopify with empty JMetafields
+        MetafieldAPI.UpdateMetafieldsFromShopify(JMetafields, Database::"Shpfy Customer", ShpfyCustomer.Id);
+
+        // [THEN] The metafield in the filtered namespace is removed
+        LibraryAssert.IsFalse(ShpfyMetafield.Get(FilteredMetafieldId), 'Metafield in the filtered namespace is not removed from Business Central');
+        // [THEN] The metafield in the other namespace is kept
+        LibraryAssert.IsTrue(ShpfyMetafield.Get(OtherMetafieldId), 'Metafield in another namespace is removed from Business Central');
+
+        Shop."Metafield Namespace Filter" := '';
+    end;
+
+    local procedure VerifyNamespaceFilterInQuery(GraphQLType: Enum "Shpfy GraphQL Type")
+    var
+        GraphQLQueries: Codeunit "Shpfy GraphQL Queries";
+        Parameters: Dictionary of [Text, Text];
+        GraphQL: Text;
+    begin
+        // Empty parameter: the query has no namespace argument and no unresolved placeholder
+        Parameters.Add('NamespaceFilter', '');
+        GraphQL := GraphQLQueries.GetQuery(GraphQLType, Parameters);
+        LibraryAssert.IsTrue(GraphQL.Contains('first: 50)'), 'Query ' + Format(GraphQLType) + ' must not be filtered when the parameter is empty');
+        LibraryAssert.IsFalse(GraphQL.Contains('{{NamespaceFilter}}'), 'Query ' + Format(GraphQLType) + ' has an unresolved namespace filter placeholder');
+
+        // Namespace parameter: the argument follows the page size
+        Parameters.Set('NamespaceFilter', ', namespace: \"bcentral\"');
+        GraphQL := GraphQLQueries.GetQuery(GraphQLType, Parameters);
+        LibraryAssert.IsTrue(GraphQL.Contains('first: 50, namespace: \"bcentral\")'), 'Query ' + Format(GraphQLType) + ' does not apply the namespace filter');
+    end;
+
     local procedure Initialize()
     var
         AccessToken: SecretText;

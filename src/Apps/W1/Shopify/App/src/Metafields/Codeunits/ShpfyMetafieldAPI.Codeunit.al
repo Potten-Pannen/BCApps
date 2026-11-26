@@ -27,6 +27,19 @@ codeunit 30316 "Shpfy Metafield API"
         SetShop(Shop);
     end;
 
+    /// <summary>
+    /// Gets the GraphQL argument that limits a metafield query to the namespace set on the shop.
+    /// </summary>
+    /// <param name="ShopifyShop">The Shopify shop that holds the namespace filter.</param>
+    /// <returns>An empty text when no filter is set; otherwise the namespace argument to append to the query.</returns>
+    internal procedure GetNamespaceFilterParameter(ShopifyShop: Record "Shpfy Shop"): Text
+    begin
+        if ShopifyShop."Metafield Namespace Filter" = '' then
+            exit('');
+
+        exit(', namespace: \"' + CommunicationMgt.EscapeGraphQLData(ShopifyShop."Metafield Namespace Filter") + '\"');
+    end;
+
     #region To Shopify
     internal procedure SyncMetafieldToShopify(var Metafield: Record "Shpfy Metafield"; ShopCode: Code[20]): BigInteger
     var
@@ -121,6 +134,8 @@ codeunit 30316 "Shpfy Metafield API"
     begin
         Metafield.SetRange("Parent Table No.", ParentTableId);
         Metafield.SetRange("Owner Id", OwnerId);
+        if Shop."Metafield Namespace Filter" <> '' then
+            Metafield.SetRange(Namespace, Shop."Metafield Namespace Filter");
         Metafield.SetFilter(Type, '<>%1&<>%2', Metafield.Type::string, Metafield.Type::integer);
         Metafield.SetFilter(Value, '<>%1', '');
         if Metafield.FindSet() then
@@ -189,6 +204,7 @@ codeunit 30316 "Shpfy Metafield API"
     /// </summary>
     /// <remarks>
     /// Metafields with a value longer than 2048 characters will not be imported.
+    /// When a metafield namespace filter is set on the shop, only metafields in that namespace are updated or deleted.
     /// Some metafield types are unsupported in Business Central (i.e. Rating).
     ///</remarks>
     /// <param name="JMetafields">JSON array of metafields from Shopify.</param>
@@ -239,6 +255,7 @@ codeunit 30316 "Shpfy Metafield API"
     begin
         OwnerType := Metafield.GetOwnerType(ParentTableNo);
         Parameters.Add('OwnerType', UpperCase(OwnerType.Names().Get(OwnerType.Ordinals.IndexOf(OwnerType.AsInteger()))));
+        Parameters.Add('NamespaceFilter', GetNamespaceFilterParameter(Shop));
         JResponse := CommunicationMgt.ExecuteGraphQL(Enum::"Shpfy GraphQL Type"::Metafields_GetMetafieldDefinitions, Parameters);
 
         if JsonHelper.GetJsonArray(JResponse, JMetafields, 'data.metafieldDefinitions.edges') then
@@ -332,6 +349,8 @@ codeunit 30316 "Shpfy Metafield API"
     begin
         MetaField.SetRange("Parent Table No.", ParentTableId);
         Metafield.SetRange("Owner Id", OwnerId);
+        if Shop."Metafield Namespace Filter" <> '' then
+            Metafield.SetRange(Namespace, Shop."Metafield Namespace Filter");
         if Metafield.FindSet() then
             repeat
                 MetafieldIds.Add(Metafield.Id);

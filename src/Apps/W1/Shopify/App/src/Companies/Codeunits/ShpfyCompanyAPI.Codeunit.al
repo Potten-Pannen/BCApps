@@ -338,6 +338,7 @@ codeunit 30286 "Shpfy Company API"
             exit(false);
 
         Parameters.Add('CompanyId', Format(ShopifyCompany.Id));
+        Parameters.Add('NamespaceFilter', MetafieldAPI.GetNamespaceFilterParameter(Shop));
         JResponse := CommunicationMgt.ExecuteGraphQL(GraphQLType::Companies_GetCompany, Parameters);
 
         if not JsonHelper.GetJsonObject(JResponse, JCustomer, 'data.company.mainContact') then
