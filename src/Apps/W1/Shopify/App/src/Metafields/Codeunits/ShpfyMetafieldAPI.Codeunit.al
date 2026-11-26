@@ -14,7 +14,6 @@ codeunit 30316 "Shpfy Metafield API"
         JsonHelper: Codeunit "Shpfy Json Helper";
         CommunicationMgt: Codeunit "Shpfy Communication Mgt.";
 
-
     internal procedure SetShop(ShopifyShop: Record "Shpfy Shop")
     begin
         Shop := ShopifyShop;
